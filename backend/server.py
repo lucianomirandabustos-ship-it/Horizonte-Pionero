@@ -1003,12 +1003,13 @@ async def calendar_delete(event_id: str, authorization: Optional[str] = Header(d
 
 @app.get("/")
 @app.get("/health")
+@api_router.get("/health")
 async def health_check():
     return {
         "status": "online",
         "app": "Horizonte Pionero API",
         "scout_unit": "Pioneros Tarija - ASB",
-        "version": "1.0.1 - native-bcrypt"
+        "version": "1.0.2 - fix-datetime"
     }
 
 @app.exception_handler(Exception)
