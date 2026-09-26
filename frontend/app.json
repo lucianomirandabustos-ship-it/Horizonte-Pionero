@@ -14,7 +14,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#1C0B2B"
+        "backgroundColor": "#0F0C1B"
       },
       "package": "com.horizontepionero.app",
       "usesCleartextTraffic": true,
@@ -33,7 +33,7 @@
     "splash": {
       "image": "./assets/images/splash-image.png",
       "resizeMode": "contain",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#0D0A14"
     },
     "plugins": [],
     "experiments": {
