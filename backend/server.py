@@ -11,7 +11,11 @@ import httpx
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Dict, Any, Literal
-from datetime import datetime, timezone, timedelta
+import bcrypt
+if not hasattr(bcrypt, "__about__"):
+    class _BcryptAbout:
+        __version__ = getattr(bcrypt, "__version__", "4.0.1")
+    bcrypt.__about__ = _BcryptAbout()
 from passlib.context import CryptContext
 
 ROOT_DIR = Path(__file__).parent
@@ -1007,17 +1011,21 @@ app.include_router(api_router)
 
 @app.on_event("startup")
 async def _startup():
-    await db.users.create_index("email", unique=True)
-    await db.users.create_index("user_id", unique=True)
-    await db.user_sessions.create_index("session_token", unique=True)
-    await db.user_sessions.create_index("expires_at", expireAfterSeconds=0)
-    await db.user_states.create_index("user_id", unique=True)
-    await db.approvals.create_index("approval_id", unique=True)
-    await db.approvals.create_index([("status", 1), ("created_at", 1)])
-    await db.gallery.create_index("post_id", unique=True)
-    await db.gallery.create_index([("deleted_at", 1), ("created_at", -1)])
-    await db.calendar.create_index("event_id", unique=True)
-    await db.uploads.create_index("path", unique=True)
+    try:
+        await db.users.create_index("email", unique=True)
+        await db.users.create_index("user_id", unique=True)
+        await db.user_sessions.create_index("session_token", unique=True)
+        await db.user_sessions.create_index("expires_at", expireAfterSeconds=0)
+        await db.user_states.create_index("user_id", unique=True)
+        await db.approvals.create_index("approval_id", unique=True)
+        await db.approvals.create_index([("status", 1), ("created_at", 1)])
+        await db.gallery.create_index("post_id", unique=True)
+        await db.gallery.create_index([("deleted_at", 1), ("created_at", -1)])
+        await db.calendar.create_index("event_id", unique=True)
+        await db.uploads.create_index("path", unique=True)
+        logger.info("MongoDB indexes verified successfully.")
+    except Exception as e:
+        logger.warning(f"Aviso de conexion a MongoDB durante el inicio: {e}")
 
 app.add_middleware(
     CORSMiddleware,
