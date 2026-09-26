@@ -25,7 +25,7 @@ export function baseUrl(): string {
     const ip = hostUri.split(":")[0];
     return `http://${ip}:8000`;
   }
-  return "http://192.168.0.15:8000";
+  return "https://horizonte-pionero.onrender.com";
 }
 
 export function backendBaseUrl(): string {

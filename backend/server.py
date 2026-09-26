@@ -12,11 +12,15 @@ from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Dict, Any, Literal
 import bcrypt
-if not hasattr(bcrypt, "__about__"):
-    class _BcryptAbout:
-        __version__ = getattr(bcrypt, "__version__", "4.0.1")
-    bcrypt.__about__ = _BcryptAbout()
-from passlib.context import CryptContext
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    try:
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    except Exception:
+        return False
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -29,7 +33,6 @@ db = client[db_name]
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # --------- Storage Configuration (Hybrid: Cloudinary Cloud + Local Fallback) ---------
 APP_NAME = "horizonte-pionero"
@@ -514,7 +517,7 @@ async def register(input: RegisterInput):
         "user_id": f"user_{uuid.uuid4().hex[:12]}",
         "email": email,
         "name": input.name.strip(),
-        "password_hash": pwd_context.hash(input.password),
+        "password_hash": hash_password(input.password),
         "role": input.role,
         "verification_status": verification,
         "credential_code": input.credential_code,
@@ -530,7 +533,7 @@ async def register(input: RegisterInput):
 @api_router.post("/auth/login")
 async def login(input: LoginInput):
     user = await db.users.find_one({"email": input.email.lower()}, {"_id": 0})
-    if not user or not user.get("password_hash") or not pwd_context.verify(input.password, user["password_hash"]):
+    if not user or not user.get("password_hash") or not verify_password(input.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos")
     token = await create_session(user["user_id"])
     return {"session_token": token, "user": public_user(user)}

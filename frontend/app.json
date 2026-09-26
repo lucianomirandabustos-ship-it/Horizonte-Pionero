@@ -40,6 +40,7 @@
       "typedRoutes": true
     },
     "extra": {
+      "backendUrl": "https://horizonte-pionero.onrender.com",
       "eas": {
         "projectId": "b6384ece-1219-4acb-861b-36f31f99e4a4"
       }
