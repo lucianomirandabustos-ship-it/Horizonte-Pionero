@@ -734,6 +734,19 @@ async def reject_dirigente(user_id: str, authorization: Optional[str] = Header(d
     await db.users.update_one({"user_id": user_id, "role": "dirigente"}, {"$set": {"verification_status": "rechazado", "verified_by": admin["user_id"], "verified_at": utc_now()}})
     return {"ok": True}
 
+@api_router.post("/admin/clean-demo-accounts")
+async def clean_demo_accounts(authorization: Optional[str] = Header(default=None)):
+    """Elimina las cuentas preinstaladas (admin.qa@example.com y pionero.qa@example.com)."""
+    await require_dirigente(authorization)
+    targets = ["admin.qa@example.com", "pionero.qa@example.com"]
+    users = await db.users.find({"email": {"$in": targets}}).to_list(10)
+    user_ids = [u["user_id"] for u in users]
+    if user_ids:
+        await db.users.delete_many({"user_id": {"$in": user_ids}})
+        await db.user_sessions.delete_many({"user_id": {"$in": user_ids}})
+        await db.user_states.delete_many({"user_id": {"$in": user_ids}})
+    return {"ok": True, "deleted_count": len(user_ids), "deleted_emails": targets}
+
 # --------- Fichas médicas (solo dirigentes verificados) ---------
 @api_router.get("/admin/pioneros")
 async def list_pioneros_fichas(authorization: Optional[str] = Header(default=None)):
