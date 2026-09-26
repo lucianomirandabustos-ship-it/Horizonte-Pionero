@@ -1,5 +1,5 @@
-from fastapi import FastAPI, APIRouter, Header, HTTPException, UploadFile, File, Form, Query
-from fastapi.responses import FileResponse, Response, HTMLResponse
+from fastapi import FastAPI, APIRouter, Header, HTTPException, UploadFile, File, Form, Query, Request
+from fastapi.responses import FileResponse, Response, HTMLResponse, JSONResponse
 from fastapi.concurrency import run_in_threadpool
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -1007,8 +1007,18 @@ async def health_check():
         "status": "online",
         "app": "Horizonte Pionero API",
         "scout_unit": "Pioneros Tarija - ASB",
-        "version": "1.0.0"
+        "version": "1.0.1 - native-bcrypt"
     }
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    tb = traceback.format_exc()
+    logger.error(f"Error procesando {request.method} {request.url.path}: {tb}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"{type(exc).__name__}: {str(exc)}", "trace": tb}
+    )
 
 app.include_router(api_router)
 
