@@ -1005,15 +1005,14 @@ async def calendar_delete(event_id: str, authorization: Optional[str] = Header(d
     await db.calendar.update_one({"event_id": event_id}, {"$set": {"deleted_at": utc_now()}})
     return {"ok": True}
 
-@app.get("/")
 @app.get("/health")
 @api_router.get("/health")
 async def health_check():
     return {
         "status": "online",
-        "app": "Horizonte Pionero API",
+        "app": "Horizonte Pionero API & Web",
         "scout_unit": "Pioneros Tarija - ASB",
-        "version": "1.0.2 - fix-datetime"
+        "version": "1.0.3 - web-ios-enabled"
     }
 
 @app.exception_handler(Exception)
@@ -1027,6 +1026,12 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 app.include_router(api_router)
+
+# Mount Web Application (Full support for iOS Safari PWA & Desktop)
+STATIC_WEB_DIR = ROOT_DIR / "static_web"
+if STATIC_WEB_DIR.exists():
+    from starlette.staticfiles import StaticFiles
+    app.mount("/", StaticFiles(directory=str(STATIC_WEB_DIR), html=True), name="static_web")
 
 @app.on_event("startup")
 async def _startup():
