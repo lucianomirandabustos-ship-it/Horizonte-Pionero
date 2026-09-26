@@ -30,27 +30,19 @@
       "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
-    "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-image.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#000000"
-        }
-      ],
-      "expo-font",
-      "expo-image",
-      "expo-secure-store",
-      "expo-web-browser",
-      "expo-status-bar",
-      "expo-asset",
-      "expo-sharing"
-    ],
+    "splash": {
+      "image": "./assets/images/splash-image.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "plugins": [],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b6384ece-1219-4acb-861b-36f31f99e4a4"
+      }
     }
   }
 }
