@@ -1,0 +1,41 @@
+{
+  "summary": "Backend regression passed 4/4. Public mobile preview login rendered the dashboard, but a fresh preview run displayed the authenticated dashboard followed by a second unauthenticated auth form, causing navigation testIDs to be unavailable and blocking the remaining UI flow.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Root app rendering/session boot",
+        "issue": "Public preview visibly renders dashboard content and a second login form in the same page after authentication; this creates severe vertical overflow and inconsistent DOM state.",
+        "testID": "nav-patria/auth-email",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Authenticated navigation regression",
+        "issue": "A fresh browser run could not locate data-testid nav-patria within 10 seconds even though the dashboard text was visible; checklist, Bitácora, medical save, and logout could not be reliably exercised.",
+        "affected_testIDs": ["nav-patria", "nav-bitacora", "nav-mas"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "Public mobile preview",
+        "issues": ["Duplicate app screens produce substantial overflow and expose the login form beneath authenticated content."]
+      }
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_qa_regression.py", "/app/test_reports/pytest/iteration_2.xml"],
+  "action_items": ["Investigate why Expo Router/public preview mounts or retains a second Index/auth instance after session boot; ensure exactly one authenticated root is rendered.", "Re-run all requested mobile flows after duplicate rendering and testID availability are fixed."],
+  "critical_code_review_comments": ["Supervisor logs contain a prior render crash in Reference from reading styles.referenceIcon.color; although one live run rendered, this should be verified after a clean bundle because it is a potential dashboard crash.", "Supervisor logs also show a non-blocking passlib bcrypt __about__ warning during login."],
+  "updated_files": ["/app/test_reports/iteration_2.json", "/app/test_reports/pytest/iteration_2.xml"],
+  "success_rate": {"backend": "100% (4/4)", "frontend": "20% (login/dashboard render only; remaining flows blocked)"},
+  "seed_data_creation": "Existing QA state was already populated; no new seed data created during this iteration.",
+  "retest_needed": true,
+  "should_call_test_agent_after_fix": true,
+  "context_for_next_testing_agent": "Public preview: https://scout-agenda-app.preview.emergentagent.com. Mobile viewport used: 375x667. First run logged in and showed dashboard; second fresh run visibly showed dashboard plus auth form and nav-patria testID was unavailable. Backend tests require `set -a; . frontend/.env; set +a` before pytest because the shell does not export frontend env automatically.",
+  "rca_of_issue": "Reproduction: open public preview at 375x667, log in with pionero.qa@example.com / Agenda123!, then inspect the page or open a fresh run with persisted session. The DOM/screenshot contains authenticated dashboard followed by unauthenticated auth UI, suggesting duplicate root mounting or session boot/render race rather than an API failure. Backend login/state/profile persistence independently passed."
+}

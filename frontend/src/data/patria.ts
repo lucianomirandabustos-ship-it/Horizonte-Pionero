@@ -1,0 +1,17 @@
+export const patriaPointLabels = [
+  "Registro continuo por 3 años",
+  "Compromiso activo con la Promesa y la Ley",
+  "Progresión: Búsqueda, Encuentro y Desafío",
+  "13 especialidades y competencias",
+  "Patrulla estable de 5–7 integrantes",
+  "Acompañamiento a 2 nuevos miembros",
+  "15+ noches de campamento por año",
+  "Participación en Scouts por la Vida",
+  "Campaña A Limpiar el Mundo",
+  "Participación JOTA / JOTI",
+  "2 campañas activas de solidaridad",
+  "2 programas de Tribu Tierra",
+  "60 horas de proyectos individuales",
+  "50 horas de servicio comunitario",
+  "Acompañamiento a Lobatos o Exploradores",
+];

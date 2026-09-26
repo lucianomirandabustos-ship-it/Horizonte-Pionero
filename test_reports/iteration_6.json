@@ -1,0 +1,34 @@
+{
+  "summary": "All three iteration_6 changes verified end-to-end. Backend (9/9 new tests in test_bootstrap_and_calendar.py + 14/14 regression in test_qa_regression.py & test_admin_fichas.py): (1) GET /api/auth/bootstrap-status returns {bootstrap_available: false} because admin.qa (verified dirigente) exists. (2) POST /api/auth/register with role='dirigente' + master_key='ASB-HORIZONTE-2026' yields verification_status='en_revision' (master key correctly ignored when a verified dirigente already exists). Same for registration without master_key. Pionero registration remains verificado. (3) POST /api/calendar accepts optional category field and GET /api/calendar returns it in payload; POST is 401/403 for pionero. Frontend (Expo web, 390x844): (a) Login admin.qa → jefatura-banner visible with 'MODO JEFATURA · DIRIGENTE' + 'VERIFICADO' pill, role-badge 'DIRIGENTE' visible, eyebrow 'PANEL DE JEFATURA', avatarDirigente style applied. (b) Login pionero.qa → jefatura-banner absent, role-badge absent, eyebrow 'AGENDA DEL PIONERO'. (c) Registration screen with role=dirigente → 'dirigente-pending-notice' visible with correct 'Pendiente de autorización' text; 'Clave maestra' (auth-master) field HIDDEN because bootstrap-status returns false; notice hides when switching back to pionero role. (d) Itinerario modal as dirigente shows itinerario-fab-add; tapping opens AddEventModal with all fields (add-event-title/date/time/place/desc/equipment/submit) + 8 event-cat-* pickers; submit creates event that appears in list; each event now has itinerario-delete-<id> trash button. (e) Itinerario as pionero: itinerario-fab-add absent. Only console noise: 6 benign 401s from initial pre-login /auth/me probes. No red screens.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_bootstrap_and_calendar.py",
+    "/app/test_reports/pytest/iteration_6.xml"
+  ],
+  "action_items": [
+    "None blocking. Optional (legacy from iteration_3): /app/backend/tests/test_qa_regression.py::test_health only checks that '/api/' returns a message (already passes now that landing message changed) — no action needed."
+  ],
+  "critical_code_review_comments": [
+    "server.py:207-211 bootstrap-status endpoint is public (no auth) which is intentional and correct — client needs to know whether to render the master-key input before login. Good.",
+    "server.py:256-264 register logic: verified_count == 0 check + master_key match is the ONLY path to auto-verify a dirigente. Once at least one verified dirigente exists (admin.qa is seeded), every dirigente register call sets verification='en_revision'. Correct and matches spec.",
+    "server.py:687-706 calendar_create: category is an Optional[str] (Pydantic model line 132) and stored as-is with no whitelist validation. If categories are meant to be constrained (icon mapping), consider validating against an enum on the backend. Non-blocking since UI-driven values from event-cat-* pickers should already be safe.",
+    "index.tsx:192 correctly sends master_key only when role=dirigente; api.ts:146 bootstrapStatus() wired; AuthScreen (line 440) conditionally renders auth-master based on bootstrapAvailable. Good.",
+    "ItinerarioModal.tsx: itinerario-fab-add gated on verified dirigente only (confirmed by frontend test - pionero does not see it). AddEventModal fields fully labeled with testIDs matching spec."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_bootstrap_and_calendar.py",
+    "/app/test_reports/iteration_6.json",
+    "/app/test_reports/pytest/iteration_6.xml"
+  ],
+  "success_rate": {"backend": "100% (9/9 new + 14/14 regression)", "frontend": "100% (all acceptance criteria verified)"},
+  "seed_data_creation": "Created 3 dirigente + 3 pionero test users via /api/auth/register (all cleaned up from db.users afterwards). Created one calendar event 'TEST QA Reunion' from the UI and deleted it via DELETE /api/calendar/<id>.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Preview URL: https://scout-agenda-app.preview.emergentagent.com. Login returns 'session_token' (not 'token'). Calendar 'equipment' is a list, not a string. Mobile viewport 390x844. New testIDs: jefatura-banner, role-badge, dirigente-pending-notice, itinerario-fab-add, add-event-{title,date,time,place,desc,equipment,submit}, event-cat-*, itinerario-delete-<event_id>. Auth toggle uses testID 'auth-switch' and role selection uses 'role-pionero' / 'role-dirigente'. Run backend tests with: `set -a; . backend/.env; . frontend/.env; set +a; python -m pytest backend/tests/test_bootstrap_and_calendar.py -v -o addopts= --junitxml=/app/test_reports/pytest/iteration_N.xml`."
+}

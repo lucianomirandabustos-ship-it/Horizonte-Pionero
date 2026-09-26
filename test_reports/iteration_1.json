@@ -1,0 +1,23 @@
+{
+  "summary": "Verified public Expo preview on mobile and authenticated backend regression flows. Login, dashboard, Scout checklist toggle, progression quotas, Bitácora creation, profile save, logout, and API persistence all passed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_qa_regression.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": ["Add data-testid/testID attributes to interactive controls for stable automated regression coverage.", "Align frontend API configuration with the required EXPO_BACKEND_URL key, or document the intentional EXPO_PUBLIC_BACKEND_URL fallback."],
+  "critical_code_review_comments": ["The referenced index.tsx has no testID attributes on buttons or inputs, contrary to the mobile testing contract; current tests rely on text and input order.", "src/api.ts reads EXPO_PUBLIC_BACKEND_URL rather than EXPO_BACKEND_URL; current preview works because the public key is configured, but this can break deployments that only provide the required key."],
+  "updated_files": ["/app/backend/tests/test_qa_regression.py", "/app/test_reports/iteration_1.json", "/app/test_reports/pytest/pytest_results.xml"],
+  "success_rate": {"backend": "100% (4/4)", "frontend": "100% (all requested executable flows passed)"},
+  "seed_data_creation": "Updated the QA user's state with a temporary QA reflection and profile values during persistence testing; no new user was created.",
+  "retest_needed": true,
+  "should_call_test_agent_after_fix": true,
+  "context_for_next_testing_agent": "Public preview https://scout-agenda-app.preview.emergentagent.com. Mobile flow passed at 375x667. Google OAuth was not automated, as expected.",
+  "rca_of_issue": "No runtime issue reproduced. Expo supervisor logs contained an earlier malformed JSX red-screen trace, but the current public preview rendered and completed the full flow successfully; likely stale prior bundle/log output. Backend emitted a non-blocking passlib bcrypt version warning."
+}

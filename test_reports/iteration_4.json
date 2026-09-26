@@ -1,0 +1,33 @@
+{
+  "summary": "Bug batch (Jan 2026) fully verified end-to-end. Backend: 11/11 tests pass (test_bug_batch_jan2026.py) covering /api/docs/agenda + /api/docs/specialties PDFs (magic bytes + content-type verified), POST /api/approvals/request kind='tribu', POST /api/admin/approvals/{id}/decide approve->state.tribu_tierra[ref_id].approved=True & status='aprobado', reject->status='rechazado' + review_note persisted, patria/service regression, and 401/403 for pionero on inbox. Frontend on mobile viewport 390x844: (1) Murciélago now shows M=0, U=1, R=2, C=3, I=4, E=5, L=6, A=7, G=8, O=9 in header cells + helper text mentions M=0..O=9, and encode('MURCIELAGO') outputs '0 1 2 3 4 5 6 7 8 9'; (2) 'Oración del Pionero' modal body matches the required Serenity-Prayer text exactly after whitespace normalization; (3) Tribu Tierra: Pionero completed 3 checklist items -> 'Solicitar aprobación al dirigente' visible -> tapped -> status became 'PENDIENTE DE APROBACIÓN'; Dirigente inbox showed row prefixed 'Tribu Tierra · Champions for Nature' -> Aprobar -> Pionero re-login sees 'APROBADO POR DIRIGENTE' and request button is absent, checklist locked (tapping does not toggle nor change status); (4) PDF viewer opens both 'Agenda del Pionero' and 'Especialidades Scouts' inside pdf-web-frame with an iframe pointing at gview + /api/docs/<kind> and pdf-open-external is visible. No red screens, no console errors during the flow.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_bug_batch_jan2026.py",
+    "/app/test_reports/pytest/iteration_4.xml"
+  ],
+  "action_items": [
+    "None for these 4 bugs — all fixes verified. Optional cleanup: legacy /app/backend/tests/test_qa_regression.py still asserts old landing message 'Agenda del Pionero API' vs current 'Horizonte Pionero API' (non-blocking, tracked from iteration_3)."
+  ],
+  "critical_code_review_comments": [
+    "server.py:498-505 (request tribu) and 583-590 (decide tribu) correctly mutate state.tribu_tierra[ref_id]; keeps prior checks and toggles approved/status atomically. Good.",
+    "TribuTierraModal.setChecked correctly no-ops when approved=true, ensuring checklist lock post-approval. Consider also locking when status='pendiente' to prevent silent divergence with the approval snapshot (currently the code does lock via 'locked = st==\"aprobado\" || st==\"pendiente\"' in the Pressable, so behavior is correct, just verify writes: setChecked only blocks on approved, so a pendiente user COULD toggle checkboxes silently if the Pressable were bypassed — minor defensive gap).",
+    "PdfViewer uses gview iframe with public URL for web preview. Works, but Google gview has known intermittent limits; consider react-pdf or pdfjs-dist as a longer-term fallback.",
+    "server.py PDF_FILES map is minimal and safe against path traversal (fixed keys). Good."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_bug_batch_jan2026.py",
+    "/app/test_reports/iteration_4.json",
+    "/app/test_reports/pytest/iteration_4.xml"
+  ],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100% (4/4 bugs verified)"},
+  "seed_data_creation": "Multiple tribu approval requests were created for pionero.qa (solar/nature/plastic) during backend + frontend runs; one 'nature' request was approved by admin.qa via UI, one 'plastic' was approved via backend test, one 'solar' was rejected via backend test. Existing patria/service regression approvals also stacked in inbox.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Preview: https://scout-agenda-app.preview.emergentagent.com. Use mobile viewport 390x844. Login testIDs are auth-email / auth-password / auth-submit (not login-*). Navigation testIDs are nav-inicio/nav-patria/nav-bitacora/nav-mas — after login the last-active section persists, so click nav-inicio before searching quick-* cards. Logout button testID is logout-btn (inside 'Más' tab). Admin inbox rows are inbox-item-<id> with inbox-approve-<id>/inbox-reject-<id> buttons; tribu rows carry the label 'Tribu Tierra · <program_name>'. Run backend tests with: `set -a; . frontend/.env; set +a; python -m pytest backend/tests/test_bug_batch_jan2026.py -v -o addopts= --junitxml=/app/test_reports/pytest/iteration_N.xml` (the -o addopts= is required because backend/pytest.ini enables xdist which conflicts with session-scoped fixtures used here). Master key ASB-HORIZONTE-2026 is only needed if QA accounts don't exist; they already do."
+}

@@ -1,0 +1,44 @@
+{
+  "summary": "Phase 2 (RBAC, approvals, Libro de Oro, Itinerario) fully validated. Backend 14/14 tests pass covering registro dirigente con/sin master_key, approvals request→pendiente, admin inbox RBAC (403 pionero), approve→state.patria[idx]=true & status aprobado, reject→note & rechazado, gallery feed post-round-trip, calendar RBAC (403 pionero / 200 dirigente), and upload auth (401 sin token). Frontend flows verified on mobile viewport 390x844: login pionero + patria-request-N muestra badge 'Pendiente'; login dirigente muestra hero 'PANEL DE JEFATURA' y quick-admin; inbox-approve-* aprueba y el ítem desaparece; quick-libro y quick-itinerario abren sin crash tras corregir bug de storage.get/storage.set; pionero refresca y ve 'Aprobado por dirigente' en verde en el punto aprobado. Se aplicó un fix menor en ItinerarioModal para desbloquear la UI (renombrar métodos inexistentes storage.get/set por getItem/setItem del singleton real).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "ItinerarioModal",
+        "issue": "Usaba métodos inexistentes storage.get/storage.set del singleton Storage (que expone getItem/setItem). Provocaba TypeError _srcUtilsStorage.storage.get is not a function y disparaba el ErrorBoundary rojo ('Something went wrong') al abrir el modal desde quick-itinerario. Aplicado fix mínimo (getItem/setItem + JSON parse/stringify) para desbloquear el testing; el main agent debería consolidar el contrato (o exponer get/set en la clase Storage, o migrar todos los llamadores a getItem/setItem). Reference: /app/frontend/src/components/ItinerarioModal.tsx:22,28",
+        "testID": "quick-itinerario",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase2_rbac.py",
+    "/app/test_reports/pytest/iteration_3.xml"
+  ],
+  "action_items": [
+    "Revisar el API del singleton storage (src/utils/storage): decidir si expone get/set o si todos los consumidores deben usar getItem/setItem. Actualmente ItinerarioModal fue parcheado con getItem/setItem + JSON stringify/parse; considerar tipar objetos anidados apropiadamente en StorageItemValue.",
+    "Corregir/actualizar test antiguo /app/backend/tests/test_qa_regression.py::test_health, aún espera 'Agenda del Pionero API' cuando el backend devuelve 'Horizonte Pionero API' (fase 1 legacy, no bloqueante para fase 2).",
+    "Silenciar el warning de passlib bcrypt __about__ (opcional, no bloqueante)."
+  ],
+  "critical_code_review_comments": [
+    "server.py: al construir approval doc se usa datetime UTC-aware pero varios expires_at/checks también lo hacen; consistencia OK. Se recomienda un índice por user_id en db.approvals para escalar mine/inbox si crece.",
+    "server.py:224 aceptar master_key vacía como 'verificado' si MASTER_DIRIGENTE_KEY vacía está correctamente bloqueada; buen guardarraíl.",
+    "server.py:378 la lógica de acceso a archivos permite lectura de imágenes de galería sin ownership, lo cual es intencional y correcto para el Libro de Oro compartido.",
+    "Frontend: contrato del singleton storage inconsistente entre index.ts (getItem/setItem) e implementación web (index.web.ts) — verificar paridad de métodos."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase2_rbac.py",
+    "/app/frontend/src/components/ItinerarioModal.tsx",
+    "/app/test_reports/iteration_3.json",
+    "/app/test_reports/pytest/iteration_3.xml"
+  ],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "100% (5/5 flujos Fase 2 verificados)"},
+  "seed_data_creation": "Registros dirigente QA temporales creados vía POST /api/auth/register (para asertar verificación); se creó un evento 'QA event *' en calendar y un post en gallery durante los tests; approvals de índices 3, 5, 7 y 8 en patria del usuario pionero.qa.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Preview: https://scout-agenda-app.preview.emergentagent.com. Usar mobile viewport 390x844. Backend tests: `set -a; . frontend/.env; set +a; pytest backend/tests/test_phase2_rbac.py -v`. Storage singleton fix aplicado en ItinerarioModal.tsx (getItem/setItem con JSON manual). El estado del pionero.qa tras esta corrida contiene varios puntos Patria aprobados/rechazados; para pruebas idempotentes usar los helpers _reset_patria_index del pytest.",
+  "rca_of_issue": "Bug HIGH resuelto: ItinerarioModal invocaba storage.get()/storage.set() pero el singleton (src/utils/storage/index.ts y index.web.ts) sólo expone getItem/setItem/secureGet/secureSet. Al abrir el modal desde quick-itinerario, React lanzaba TypeError durante el efecto y ErrorBoundary mostraba 'Something went wrong', dejando la app inutilizable hasta reload. Fix: reemplazar por getItem/setItem con JSON manual (objeto anidado no encaja en StorageItemValue). Reproducción previa: login como cualquier usuario → toque en 'Itinerario' quick card → red screen. Post-fix: modal abre y renderiza eventos con checklist 'mi checklist de equipo'."
+}

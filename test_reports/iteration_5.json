@@ -1,0 +1,32 @@
+{
+  "summary": "Fichas médicas (Dirigente viewer) feature fully verified end-to-end. Backend: 10/10 pytest passing in test_admin_fichas.py — GET /api/admin/pioneros returns 200 with all required fields (user_id, name, email, patrol, group_number, stage, blood_type, allergies, medical_conditions, medical_insurance, emergency_contact, emergency_phone, camping_nights); 403 for pionero role; 401 for missing/invalid token; response includes only role='pionero' users (admin.qa excluded); values reflect PUT /api/profile updates; each call appends 1 entry to db.access_log with action='list_pioneros_fichas', actor_id (user_*), and count>=1. Frontend on 390x844 Expo web: logged in as admin.qa → opened Panel de Jefatura via quick-admin → 4 tabs visible (Aprobaciones, Dirigentes, Fichas médicas, Itinerario). Tapping 'Fichas médicas' revealed fichas-search input + 3 pionero cards (ficha-<user_id>). Search filtered: 'Halcones' → 1 result (Pionero QA), 'O+' → 2 results, 'Pionero QA' → 1 result. Tapping a card expanded ficha-details-<user_id> showing TIPO DE SANGRE O+, ALERGIAS 'Polen y maní' rendered in red rgb(214,40,40), Asma leve, OSDE 210, María Pérez, correo, and ficha-call-<user_id> button 'Llamar +54 9 11 5555 1234'. Regression: PDF endpoints (/docs/agenda + /docs/specialties) return valid PDFs; tribu approval request→admin approve flow still returns status='aprobado'. No red screens, no console errors (only a benign 401 during initial auto /auth/me before login).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_admin_fichas.py",
+    "/app/test_reports/pytest/iteration_5.xml"
+  ],
+  "action_items": [
+    "None — feature is complete and verified. Optional cleanup (still open from iteration_3): legacy /app/backend/tests/test_qa_regression.py asserts old landing message 'Agenda del Pionero API' vs current 'Horizonte Pionero API' (non-blocking)."
+  ],
+  "critical_code_review_comments": [
+    "server.py:439-470 correctly guards /admin/pioneros with require_dirigente (role=dirigente AND verification_status=verificado), only reads role='pionero' users, excludes _id and password_hash from projection, and writes an audit entry to db.access_log with actor_id, actor_name, action, count, at. Good.",
+    "AdminPanel.tsx FichasSection: memoized search filter over name/patrol/blood_type/email; allergies highlighted with colors.error only when trimmed value is non-empty (no false-positive when 'Sin registrar'); tel: linking uses phone.replace(/[^0-9+]/g,'') which correctly strips spaces from '+54 9 11 5555 1234'. Good.",
+    "Minor: FichasSection lacks a pull-to-refresh; polling is done only inside the parent AdminPanel every 10s but Fichas has its own useEffect that calls load() once. If a pionero updates their medical profile while the dirigente panel is open on the Fichas tab, they'd have to close/reopen to see the change. Not a blocker."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_admin_fichas.py",
+    "/app/test_reports/iteration_5.json",
+    "/app/test_reports/pytest/iteration_5.xml"
+  ],
+  "success_rate": {"backend": "100% (10/10)", "frontend": "100% (all acceptance criteria verified)"},
+  "seed_data_creation": "Updated pionero.qa@example.com profile via PUT /api/profile with blood_type=O+, allergies='Polen y maní', medical_conditions='Asma leve', medical_insurance='OSDE 210', emergency_contact='María Pérez (madre)', emergency_phone='+54 9 11 5555 1234', patrol='Halcones' so both automated and manual QA have meaningful ficha data. Regression test added a new tribu approval request from pionero.qa (approved by admin.qa).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Preview URL: https://scout-agenda-app.preview.emergentagent.com. Mobile viewport 390x844 for Expo web. Login testIDs: auth-email/auth-password/auth-submit. Admin flow: nav-inicio → quick-admin (or hero-cta) → admin-tab-fichas → fichas-search → ficha-<user_id> tap → ficha-details-<user_id> / ficha-call-<user_id>. Backend tests: `set -a; . backend/.env; . frontend/.env; set +a; python -m pytest backend/tests/test_admin_fichas.py -v -o addopts= --junitxml=/app/test_reports/pytest/iteration_N.xml` (-o addopts= required because /app/backend/pytest.ini enables xdist which conflicts with module-scoped fixtures)."
+}
