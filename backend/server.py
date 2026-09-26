@@ -794,7 +794,9 @@ async def request_approval(input: ApprovalRequestInput, authorization: Optional[
     state_rec = await db.user_states.find_one({"user_id": user["user_id"]}, {"_id": 0})
     state = state_rec.get("state") if state_rec else DEFAULT_STATE.copy()
     if input.kind == "patria":
-        idx = int(input.ref_id)
+        import re
+        m = re.findall(r'\d+', str(input.ref_id))
+        idx = max(0, min(int(m[0]) if m else 0, 14))
         patria_status = list(state.get("patria_status") or ["idle"] * 15)
         while len(patria_status) < 15:
             patria_status.append("idle")
@@ -876,7 +878,9 @@ async def decide_approval(approval_id: str, input: ApprovalDecisionInput, author
     if state_rec:
         state = state_rec.get("state", DEFAULT_STATE.copy())
         if appr["kind"] == "patria":
-            idx = int(appr["ref_id"])
+            import re
+            m = re.findall(r'\d+', str(appr.get("ref_id", "")))
+            idx = max(0, min(int(m[0]) if m else 0, 14))
             patria = list(state.get("patria") or [False] * 15)
             while len(patria) < 15:
                 patria.append(False)
