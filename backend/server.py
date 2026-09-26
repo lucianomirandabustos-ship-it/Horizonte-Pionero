@@ -1025,6 +1025,14 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": f"{type(exc).__name__}: {str(exc)}", "trace": tb}
     )
 
+@app.exception_handler(404)
+async def spa_not_found_handler(request: Request, exc: Any):
+    if STATIC_WEB_DIR.exists() and request.method == "GET" and not request.url.path.startswith("/api"):
+        index_file = STATIC_WEB_DIR / "index.html"
+        if index_file.exists():
+            return FileResponse(index_file)
+    return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
 app.include_router(api_router)
 
 # Mount Web Application (Full support for iOS Safari PWA & Desktop)
