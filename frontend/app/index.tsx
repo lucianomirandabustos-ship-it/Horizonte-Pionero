@@ -38,6 +38,7 @@ import TribuTierraModal from "@/src/components/TribuTierraModal";
 import ServicioModal from "@/src/components/ServicioModal";
 import OfflineSetupModal from "@/src/components/OfflineSetupModal";
 import { ReferenceKey } from "@/src/data/references";
+import { TARIJA_VENUES } from "@/src/data/tarija";
 import { AGENDA_SECTIONS, AgendaSection, GrowthAreaDetail } from "@/src/data/agenda";
 import {
   SpecialtiesHomeScreen,
@@ -387,6 +388,9 @@ export default function Index() {
     updateState({ ...state, notes: [{ id: `note-${Date.now()}`, title: noteTitle.trim(), body: noteBody.trim(), date: "Ahora" }, ...state.notes] });
     setNoteTitle(""); setNoteBody("");
   };
+  const deleteNote = (noteId: string) => {
+    updateState({ ...state, notes: state.notes.filter((n) => n.id !== noteId) });
+  };
   const saveProfile = async () => {
     const updatedProfile = { ...profileForm, camping_nights: Number(profileForm.camping_nights) || 0 };
     if (user?.user_id === "offline_pionero") {
@@ -529,7 +533,7 @@ export default function Index() {
           }
           try { await api.requestApproval({ kind: "patria", ref_id: String(idx), text: pointLabels[idx] }); await refreshState(); } catch { /* ignore */ }
         }} />}
-        {section === "bitacora" && <BitacoraScreen styles={styles} colors={colors} state={state} noteTitle={noteTitle} noteBody={noteBody} setNoteTitle={setNoteTitle} setNoteBody={setNoteBody} saveNote={saveNote} totalHours={totalHours} serviceHours={serviceHours} openLibro={() => setLibroOpen(true)} openServicio={() => setServicioOpen(true)} />}
+        {section === "bitacora" && <BitacoraScreen styles={styles} colors={colors} state={state} noteTitle={noteTitle} noteBody={noteBody} setNoteTitle={setNoteTitle} setNoteBody={setNoteBody} saveNote={saveNote} deleteNote={deleteNote} totalHours={totalHours} serviceHours={serviceHours} openLibro={() => setLibroOpen(true)} openServicio={() => setServicioOpen(true)} />}
         {section === "mas" && <MoreScreen styles={styles} colors={colors} user={user} state={state} profileForm={profileForm} setProfileForm={setProfileForm} saveProfile={saveProfile} logout={logout} openTool={setToolOpen} openCamping={() => setCampingOpen(true)} openTarija={() => setTarijaOpen(true)} refreshUser={async () => { try { const r = await api.me(); setUser(r.user); } catch { /* ignore */ } }} />}
       </ScrollView>
       <PdfModal kind={pdfViewer} uri={pdfUri} colors={colors} styles={styles} onClose={() => setPdfViewer(null)} />
@@ -552,7 +556,15 @@ export default function Index() {
       <AdminPanel visible={adminOpen} onClose={() => setAdminOpen(false)} user={user} colors={colors} styles={styles} onDataChange={refreshState} initialTab={adminTab} />
       <LibroDeOroModal visible={libroOpen} onClose={() => setLibroOpen(false)} currentUser={user} colors={colors} styles={styles} />
       <ItinerarioModal visible={itinerarioOpen} onClose={() => setItinerarioOpen(false)} currentUser={user} colors={colors} styles={styles} />
-      <TarijaVenuesModal visible={tarijaOpen} onClose={() => setTarijaOpen(false)} colors={colors} styles={styles} />
+      <TarijaVenuesModal
+        visible={tarijaOpen}
+        onClose={() => setTarijaOpen(false)}
+        colors={colors}
+        styles={styles}
+        currentUser={user}
+        venues={state.venues ?? TARIJA_VENUES}
+        onSaveVenues={(v: any) => updateState({ ...state, venues: v })}
+      />
       <CampingRegisterModal
         visible={campingOpen}
         onClose={() => setCampingOpen(false)}
@@ -1243,10 +1255,200 @@ function PatriaScreen({ styles, colors, state, progressPercent, togglePoint, use
   );
 }
 
-function BitacoraScreen({ styles, colors, state, noteTitle, noteBody, setNoteTitle, setNoteBody, saveNote, totalHours, serviceHours, openLibro, openServicio }: any) {
+function BitacoraScreen({ styles, colors, state, noteTitle, noteBody, setNoteTitle, setNoteBody, saveNote, deleteNote, totalHours, serviceHours, openLibro, openServicio }: any) {
   const campingTotals = computeCampingTotals(state);
   const campingNights = campingTotals.approved;
-  return <View><Text style={styles.pageEyebrow}>MEMORIA Y SERVICIO</Text><Text style={styles.pageTitle}>Cartilla, Bitácora & Libro de Oro</Text><Text style={styles.pageSubtitle}>Escribe lo que aprendiste. Tus recuerdos viajan contigo y se sincronizan.</Text><Pressable testID="bitacora-libro" onPress={openLibro} style={[styles.toolBanner, { flexDirection: "row" }]}><MaterialCommunityIcons name="image-multiple" size={28} color={colors.brandSecondary} /><View style={styles.toolBannerCopy}><Text style={styles.toolBannerTitle}>Libro de Oro compartido</Text><Text style={styles.toolBannerText}>Sube y revisa los recuerdos visuales de la unidad.</Text></View><MaterialCommunityIcons name="chevron-right" size={19} color={colors.muted} /></Pressable><Pressable testID="bitacora-servicio" onPress={openServicio} style={[styles.toolBanner, { flexDirection: "row" }]}><MaterialCommunityIcons name="hand-heart-outline" size={28} color={colors.brandSecondary} /><View style={styles.toolBannerCopy}><Text style={styles.toolBannerTitle}>Servicio a la comunidad</Text><Text style={styles.toolBannerText}>Registra horas voluntarias · requieren aprobación.</Text></View><MaterialCommunityIcons name="chevron-right" size={19} color={colors.muted} /></Pressable><View style={styles.noteComposer}><Text style={styles.composerTitle}>Nueva reflexión</Text><TextInput value={noteTitle} onChangeText={setNoteTitle} style={styles.input} placeholder="Título · Reunión, campamento…" placeholderTextColor={styles.placeholder.color} /><TextInput value={noteBody} onChangeText={setNoteBody} style={[styles.input, styles.textArea]} placeholder="¿Qué aprendiste hoy?" placeholderTextColor={styles.placeholder.color} multiline textAlignVertical="top" /><Pressable onPress={saveNote} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}><MaterialCommunityIcons name="plus" size={18} color={colors.onBrandSecondary} /><Text style={styles.secondaryButtonText}>Guardar en bitácora</Text></Pressable></View><View style={styles.statsRow}><Stat label="Proyectos" value={`${totalHours}h`} icon="leaf-circle-outline" styles={styles} /><Stat label="Servicio" value={`${serviceHours}h`} icon="hand-heart-outline" styles={styles} /><Stat label="Noches" value={`${campingNights}`} icon="tent" styles={styles} /></View><Text style={styles.sectionTitle}>Últimas reflexiones</Text>{state.notes.length === 0 ? <Empty icon="notebook-outline" text="Tu primera historia comienza aquí." styles={styles} /> : state.notes.slice(0, 4).map((note: any) => <View style={styles.noteRow} key={note.id}><View style={styles.noteIcon}><MaterialCommunityIcons name="feather" size={18} color={colors.brandSecondary} /></View><View style={styles.noteCopy}><Text style={styles.noteTitle}>{note.title}</Text><Text style={styles.noteBody} numberOfLines={2}>{note.body}</Text><Text style={styles.noteDate}>{note.date}</Text></View></View>)}<Text style={styles.sectionTitle}>Comunidad</Text>{state.announcements.map((item: any) => <View style={styles.announcement} key={item.id}><Text style={styles.announcementDate}>{item.date.toUpperCase()}</Text><Text style={styles.announcementTitle}>{item.title}</Text><Text style={styles.noteBody}>{item.body}</Text></View>)}</View>;
+  const [selectedNote, setSelectedNote] = useState<any>(null);
+
+  const confirmDelete = (note: any) => {
+    Alert.alert(
+      "Eliminar reflexión",
+      `¿Deseas eliminar la reflexión "${note.title}"?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: () => {
+            deleteNote?.(note.id);
+            setSelectedNote(null);
+          },
+        },
+      ]
+    );
+  };
+
+  return (
+    <View>
+      <Text style={styles.pageEyebrow}>MEMORIA Y SERVICIO</Text>
+      <Text style={styles.pageTitle}>Cartilla, Bitácora & Libro de Oro</Text>
+      <Text style={styles.pageSubtitle}>Escribe lo que aprendiste. Tus recuerdos viajan contigo y se sincronizan.</Text>
+      <Pressable testID="bitacora-libro" onPress={openLibro} style={[styles.toolBanner, { flexDirection: "row" }]}>
+        <MaterialCommunityIcons name="image-multiple" size={28} color={colors.brandSecondary} />
+        <View style={styles.toolBannerCopy}>
+          <Text style={styles.toolBannerTitle}>Libro de Oro compartido</Text>
+          <Text style={styles.toolBannerText}>Sube y revisa los recuerdos visuales de la unidad.</Text>
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={19} color={colors.muted} />
+      </Pressable>
+      <Pressable testID="bitacora-servicio" onPress={openServicio} style={[styles.toolBanner, { flexDirection: "row" }]}>
+        <MaterialCommunityIcons name="hand-heart-outline" size={28} color={colors.brandSecondary} />
+        <View style={styles.toolBannerCopy}>
+          <Text style={styles.toolBannerTitle}>Servicio a la comunidad</Text>
+          <Text style={styles.toolBannerText}>Registra horas voluntarias · requieren aprobación.</Text>
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={19} color={colors.muted} />
+      </Pressable>
+      <View style={styles.noteComposer}>
+        <Text style={styles.composerTitle}>Nueva reflexión</Text>
+        <TextInput value={noteTitle} onChangeText={setNoteTitle} style={styles.input} placeholder="Título · Reunión, campamento…" placeholderTextColor={styles.placeholder.color} />
+        <TextInput value={noteBody} onChangeText={setNoteBody} style={[styles.input, styles.textArea]} placeholder="¿Qué aprendiste hoy?" placeholderTextColor={styles.placeholder.color} multiline textAlignVertical="top" />
+        <Pressable onPress={saveNote} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}>
+          <MaterialCommunityIcons name="plus" size={18} color={colors.onBrandSecondary} />
+          <Text style={styles.secondaryButtonText}>Guardar en bitácora</Text>
+        </Pressable>
+      </View>
+      <View style={styles.statsRow}>
+        <Stat label="Proyectos" value={`${totalHours}h`} icon="leaf-circle-outline" styles={styles} />
+        <Stat label="Servicio" value={`${serviceHours}h`} icon="hand-heart-outline" styles={styles} />
+        <Stat label="Noches" value={`${campingNights}`} icon="tent" styles={styles} />
+      </View>
+
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 22, marginBottom: 8 }}>
+        <Text style={[styles.sectionTitle, { marginTop: 0, marginBottom: 0 }]}>Tus reflexiones ({state.notes.length})</Text>
+        <Text style={{ fontSize: 11, color: colors.muted }}>Toca para ver completa</Text>
+      </View>
+
+      {state.notes.length === 0 ? (
+        <Empty icon="notebook-outline" text="Tu primera historia comienza aquí. Escribe tu reflexión arriba." styles={styles} />
+      ) : (
+        state.notes.map((note: any) => (
+          <Pressable
+            key={note.id}
+            onPress={() => setSelectedNote(note)}
+            style={({ pressed }) => [
+              styles.noteRow,
+              { alignItems: "center" },
+              pressed && { opacity: 0.8, backgroundColor: colors.surfaceTertiary },
+            ]}
+          >
+            <View style={styles.noteIcon}>
+              <MaterialCommunityIcons name="feather" size={18} color={colors.brandSecondary} />
+            </View>
+            <View style={styles.noteCopy}>
+              <Text style={styles.noteTitle}>{note.title}</Text>
+              <Text style={styles.noteBody} numberOfLines={2}>
+                {note.body}
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
+                <Text style={styles.noteDate}>{note.date}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                  <Text style={{ fontSize: 11, color: colors.brandSecondary, fontWeight: "700" }}>Leer completa</Text>
+                  <MaterialCommunityIcons name="chevron-right" size={14} color={colors.brandSecondary} />
+                </View>
+              </View>
+            </View>
+          </Pressable>
+        ))
+      )}
+
+      {/* Modal de lectura completa de la reflexión */}
+      <Modal
+        visible={!!selectedNote}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setSelectedNote(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center", padding: 20 }}>
+          <View style={{
+            backgroundColor: colors.surfaceSecondary,
+            borderRadius: 22,
+            borderWidth: 1,
+            borderColor: colors.border,
+            width: "100%",
+            maxWidth: 520,
+            maxHeight: "85%",
+            overflow: "hidden",
+            padding: 22,
+          }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+              <View style={{ flex: 1, paddingRight: 10 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  <MaterialCommunityIcons name="feather" size={16} color={colors.brandSecondary} />
+                  <Text style={{ fontSize: 11, color: colors.brandSecondary, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.8 }}>
+                    Bitácora de Unidad
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 19, fontWeight: "800", color: colors.onSurfaceSecondary }}>
+                  {selectedNote?.title}
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.muted, marginTop: 3 }}>
+                  Fecha registrada: {selectedNote?.date}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setSelectedNote(null)}
+                style={{ padding: 6, backgroundColor: colors.surfaceTertiary, borderRadius: 12 }}
+              >
+                <MaterialCommunityIcons name="close" size={20} color={colors.onSurfaceSecondary} />
+              </Pressable>
+            </View>
+
+            <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 8 }} />
+
+            <ScrollView style={{ maxHeight: 340, marginVertical: 8 }} showsVerticalScrollIndicator>
+              <Text style={{ fontSize: 14, lineHeight: 22, color: colors.onSurfaceSecondary }}>
+                {selectedNote?.body}
+              </Text>
+            </ScrollView>
+
+            <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 12 }} />
+
+            <View style={{ flexDirection: "row", gap: 10, justifyContent: "flex-end" }}>
+              <Pressable
+                onPress={() => selectedNote && confirmDelete(selectedNote)}
+                style={{
+                  paddingVertical: 10,
+                  paddingHorizontal: 14,
+                  borderRadius: 12,
+                  backgroundColor: "rgba(239, 68, 68, 0.12)",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <MaterialCommunityIcons name="trash-can-outline" size={16} color={colors.error || "#ef4444"} />
+                <Text style={{ color: colors.error || "#ef4444", fontSize: 12, fontWeight: "700" }}>Eliminar</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setSelectedNote(null)}
+                style={{
+                  paddingVertical: 10,
+                  paddingHorizontal: 20,
+                  borderRadius: 12,
+                  backgroundColor: colors.brandSecondary,
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: colors.onBrandSecondary, fontSize: 13, fontWeight: "800" }}>Cerrar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Text style={styles.sectionTitle}>Comunidad</Text>
+      {state.announcements.map((item: any) => (
+        <View style={styles.announcement} key={item.id}>
+          <Text style={styles.announcementDate}>{item.date.toUpperCase()}</Text>
+          <Text style={styles.announcementTitle}>{item.title}</Text>
+          <Text style={styles.noteBody}>{item.body}</Text>
+        </View>
+      ))}
+    </View>
+  );
 }
 
 function MoreScreen({ styles, colors, user, state, profileForm, setProfileForm, saveProfile, logout, openTool, openCamping, openTarija, refreshUser }: any) {

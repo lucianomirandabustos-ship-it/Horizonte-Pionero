@@ -116,6 +116,11 @@ class GalleryPostInput(BaseModel):
     caption: str
     file_path: str
 
+class Base64UploadInput(BaseModel):
+    base64_data: str
+    filename: Optional[str] = "photo.jpg"
+    purpose: str = "gallery"
+
 class EventInput(BaseModel):
     id: Optional[str] = None
     title: str
@@ -682,31 +687,91 @@ async def upload_file(file: UploadFile = File(...), purpose: str = Form("misc"),
     })
     return {"path": obj_path, "size": len(contents)}
 
+@api_router.post("/upload/base64")
+async def upload_file_base64(input: Base64UploadInput, authorization: Optional[str] = Header(default=None)):
+    """Sube imágenes codificadas en base64 (100% compatible y estable con Android / iOS / Web)."""
+    user = await current_user(authorization)
+    import base64
+    raw_b64 = input.base64_data
+    if "," in raw_b64:
+        raw_b64 = raw_b64.split(",", 1)[1]
+    try:
+        contents = base64.b64decode(raw_b64)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Datos de imagen inválidos")
+
+    if len(contents) > 12 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="El archivo excede 12 MB")
+
+    if HAS_CLOUDINARY and CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
+        try:
+            res = await run_in_threadpool(
+                cloudinary.uploader.upload,
+                contents,
+                folder=f"{APP_NAME}/{input.purpose}/{user['user_id']}",
+                resource_type="auto"
+            )
+            cloud_url = res.get("secure_url") or res.get("url")
+            await db.uploads.insert_one({
+                "path": cloud_url,
+                "owner_id": user["user_id"],
+                "purpose": input.purpose,
+                "content_type": "image/jpeg",
+                "original_name": input.filename,
+                "size": len(contents),
+                "storage": "cloudinary",
+                "created_at": utc_now(),
+            })
+            return {"path": cloud_url, "size": len(contents)}
+        except Exception as e:
+            logging.warning(f"Error al subir a Cloudinary ({e}), recurriendo a almacenamiento local.")
+
+    ext = (input.filename or "").split(".")[-1].lower() if input.filename and "." in input.filename else "jpg"
+    ext = ext[:10]
+    obj_path = f"{APP_NAME}/uploads/{user['user_id']}/{uuid.uuid4().hex}.{ext}"
+    dest_path = UPLOAD_DIR / obj_path
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(dest_path, "wb") as f:
+        f.write(contents)
+
+    await db.uploads.insert_one({
+        "path": obj_path,
+        "owner_id": user["user_id"],
+        "purpose": input.purpose,
+        "content_type": f"image/{ext}",
+        "original_name": input.filename,
+        "size": len(contents),
+        "storage": "local",
+        "created_at": utc_now(),
+    })
+    return {"path": obj_path, "size": len(contents)}
+
 @api_router.get("/files/{full_path:path}")
 async def get_file(full_path: str, token: Optional[str] = Query(default=None), authorization: Optional[str] = Header(default=None)):
     if full_path.startswith("http://") or full_path.startswith("https://"):
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url=full_path)
 
-    # Web can't send auth headers on <img>, allow token query param
-    if authorization:
-        user = await current_user(authorization)
-    elif token:
-        session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
-        if not session:
-            raise HTTPException(status_code=401, detail="Token inválido")
-        user = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
-        if not user:
-            raise HTTPException(status_code=401, detail="Usuario no encontrado")
-    else:
-        raise HTTPException(status_code=401, detail="Se requiere autenticación")
-
     record = await db.uploads.find_one({"path": full_path}, {"_id": 0})
     if not record:
+        file_path = UPLOAD_DIR / full_path
+        if file_path.exists():
+            return FileResponse(file_path)
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
-    # Allow: owner, dirigente verificado, o si es foto pública del libro de oro
-    if record.get("purpose") != "gallery" and record["owner_id"] != user["user_id"] and not (user.get("role") == "dirigente" and user.get("verification_status") == "verificado"):
-        raise HTTPException(status_code=403, detail="Sin permiso")
+
+    # Si la foto es del Libro de Oro ("gallery"), es pública para la unidad scout
+    if record.get("purpose") != "gallery":
+        user = None
+        if authorization:
+            user = await current_user(authorization)
+        elif token:
+            session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+            if session:
+                user = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
+        if not user:
+            raise HTTPException(status_code=401, detail="Se requiere autenticación")
+        if record["owner_id"] != user["user_id"] and not (user.get("role") == "dirigente" and user.get("verification_status") == "verificado"):
+            raise HTTPException(status_code=403, detail="Sin permiso")
 
     file_path = UPLOAD_DIR / full_path
     if not file_path.exists():

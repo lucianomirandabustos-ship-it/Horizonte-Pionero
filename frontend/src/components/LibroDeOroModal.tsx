@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Image, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 
@@ -9,6 +9,7 @@ export function LibroDeOroModal({ visible, onClose, currentUser, colors, styles 
   const [posts, setPosts] = useState<GalleryPost[]>([]);
   const [caption, setCaption] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState("");
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [uploadedPath, setUploadedPath] = useState<string | null>(null);
   const [urls, setUrls] = useState<Record<string, string>>({});
@@ -31,52 +32,104 @@ export function LibroDeOroModal({ visible, onClose, currentUser, colors, styles 
 
   useEffect(() => { if (visible) refresh(); }, [visible, refresh]);
 
-  const pickImage = async () => {
-    if (Platform.OS !== "web") {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (perm.status !== "granted") return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"] as any,
-      quality: 0.75,
-      allowsEditing: true,
-      aspect: [4, 3],
-    });
-    if (result.canceled || !result.assets?.[0]) return;
-    const asset = result.assets[0];
-    setImageUri(asset.uri);
-    setUploading(true);
+  const pickImage = async (useCamera = false) => {
     try {
-      const name = asset.fileName || `photo-${Date.now()}.jpg`;
+      if (Platform.OS !== "web") {
+        if (useCamera) {
+          const cam = await ImagePicker.requestCameraPermissionsAsync();
+          if (cam.status !== "granted") {
+            Alert.alert("Permiso de cámara", "Se requiere permiso para abrir la cámara y registrar fotos de campamento.");
+            return;
+          }
+        } else {
+          const lib = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (lib.status !== "granted" && !lib.canAskAgain) {
+            // Android 13+ Photo Picker doesn't require permission, proceed anyway
+          }
+        }
+      }
+
+      const pickerOptions: ImagePicker.ImagePickerOptions = {
+        mediaTypes: ["images"] as any,
+        quality: 0.7,
+        allowsEditing: true,
+        aspect: [4, 3],
+        base64: true,
+      };
+
+      const result = useCamera
+        ? await ImagePicker.launchCameraAsync(pickerOptions)
+        : await ImagePicker.launchImageLibraryAsync(pickerOptions);
+
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      setImageUri(asset.uri);
+      setUploading(true);
+      setUploadMsg("Subiendo imagen al servidor...");
+
+      const name = asset.fileName || `recuerdo-${Date.now()}.jpg`;
       const mime = asset.mimeType || "image/jpeg";
-      const { path } = await uploadFile(asset.uri, name, mime, "gallery");
-      setUploadedPath(path);
-    } catch {
+
+      let res;
+      if (asset.base64) {
+        res = await api.uploadBase64(asset.base64, name, "gallery");
+      } else {
+        res = await uploadFile(asset.uri, name, mime, "gallery");
+      }
+
+      if (res?.path) {
+        setUploadedPath(res.path);
+      } else {
+        throw new Error("El servidor no devolvió la ruta de la foto.");
+      }
+    } catch (err: any) {
+      Alert.alert(
+        "Aviso al subir foto",
+        err?.message || "No se pudo subir la foto a la nube. Verifica tu conexión de datos."
+      );
       setImageUri(null);
       setUploadedPath(null);
     } finally {
       setUploading(false);
+      setUploadMsg("");
     }
   };
 
   const publish = async () => {
     if (!uploadedPath || !caption.trim()) return;
     setUploading(true);
+    setUploadMsg("Publicando en Libro de Oro...");
     try {
       await api.publishPost(caption.trim(), uploadedPath);
       setCaption("");
       setImageUri(null);
       setUploadedPath(null);
       await refresh();
+    } catch (err: any) {
+      Alert.alert("Error al publicar", err?.message || "No se pudo guardar la publicación.");
     } finally {
       setUploading(false);
+      setUploadMsg("");
     }
   };
 
   const remove = async (post: GalleryPost) => {
     if (post.user_id !== currentUser?.user_id && currentUser?.role !== "dirigente") return;
-    await api.deletePost(post.post_id).catch(() => undefined);
-    await refresh();
+    Alert.alert(
+      "Eliminar recuerdo",
+      "¿Deseas eliminar esta publicación del Libro de Oro?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: async () => {
+            await api.deletePost(post.post_id).catch(() => undefined);
+            await refresh();
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -96,15 +149,47 @@ export function LibroDeOroModal({ visible, onClose, currentUser, colors, styles 
 
           <View style={styles.profileCard}>
             <Text style={styles.resultLabel}>NUEVA PUBLICACIÓN</Text>
-            <Pressable testID="libro-pick" onPress={pickImage} disabled={uploading} style={[styles.secondaryButton, { marginTop: 10 }, uploading && { opacity: 0.6 }]}>
-              <MaterialCommunityIcons name="camera-plus-outline" size={18} color={colors.onBrandSecondary} />
-              <Text style={styles.secondaryButtonText}>{imageUri ? "Cambiar foto" : "Elegir foto"}</Text>
-            </Pressable>
-            {imageUri && (
-              <View style={{ marginTop: 12, borderRadius: 14, overflow: "hidden", height: 200, backgroundColor: colors.surfaceTertiary }}>
-                <Image source={{ uri: imageUri }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+              <Pressable
+                testID="libro-camera"
+                onPress={() => pickImage(true)}
+                disabled={uploading}
+                style={[styles.secondaryButton, { flex: 1, paddingHorizontal: 8 }, uploading && { opacity: 0.6 }]}
+              >
+                <MaterialCommunityIcons name="camera" size={18} color={colors.onBrandSecondary} />
+                <Text style={styles.secondaryButtonText}>Tomar foto</Text>
+              </Pressable>
+              <Pressable
+                testID="libro-pick"
+                onPress={() => pickImage(false)}
+                disabled={uploading}
+                style={[styles.secondaryButton, { flex: 1, paddingHorizontal: 8 }, uploading && { opacity: 0.6 }]}
+              >
+                <MaterialCommunityIcons name="image-multiple-outline" size={18} color={colors.onBrandSecondary} />
+                <Text style={styles.secondaryButtonText}>Galería</Text>
+              </Pressable>
+            </View>
+
+            {uploading && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 }}>
+                <ActivityIndicator size="small" color={colors.brandSecondary} />
+                <Text style={[styles.pdfDetail, { color: colors.brandSecondary }]}>{uploadMsg || "Cargando..."}</Text>
               </View>
             )}
+
+            {imageUri && (
+              <View style={{ marginTop: 12, borderRadius: 14, overflow: "hidden", height: 200, backgroundColor: colors.surfaceTertiary, position: "relative" }}>
+                <Image source={{ uri: imageUri }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                <Pressable
+                  onPress={() => { setImageUri(null); setUploadedPath(null); }}
+                  style={{ position: "absolute", top: 8, right: 8, backgroundColor: "rgba(0,0,0,0.65)", borderRadius: 16, padding: 6 }}
+                >
+                  <MaterialCommunityIcons name="close" size={18} color="#fff" />
+                </Pressable>
+              </View>
+            )}
+
             <TextInput
               testID="libro-caption"
               value={caption}
@@ -120,7 +205,7 @@ export function LibroDeOroModal({ visible, onClose, currentUser, colors, styles 
               onPress={publish}
               style={[styles.primaryButton, { marginTop: 12 }, (!uploadedPath || !caption.trim() || uploading) && { opacity: 0.5 }]}
             >
-              {uploading ? <ActivityIndicator color={colors.onBrandPrimary} /> : <Text style={styles.primaryButtonText}>Publicar</Text>}
+              {uploading ? <ActivityIndicator color={colors.onBrandPrimary} /> : <Text style={styles.primaryButtonText}>Publicar en Libro de Oro</Text>}
             </Pressable>
           </View>
 

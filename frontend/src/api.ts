@@ -196,6 +196,12 @@ export const api = {
   createEvent: (event: Omit<CalendarEvent, "event_id" | "creator_name"> & { id?: string }) =>
     request<{ event: CalendarEvent }>("/calendar", { method: "POST", body: JSON.stringify(event) }),
   deleteEvent: (event_id: string) => request<{ ok: boolean }>(`/calendar/${event_id}`, { method: "DELETE" }),
+  // Upload Base64 (Android & Web resilient)
+  uploadBase64: (base64_data: string, filename?: string, purpose?: string) =>
+    request<{ path: string; size: number }>("/upload/base64", {
+      method: "POST",
+      body: JSON.stringify({ base64_data, filename, purpose: purpose || "gallery" }),
+    }),
 };
 
 export type AppState = {
@@ -211,6 +217,7 @@ export type AppState = {
   events: { id: string; title: string; date: string; place: string }[];
   announcements: { id: string; title: string; body: string; date: string }[];
   earthTribe: string[];
+  venues?: any[];
   camping?: any[];
   camping_log?: { id: string; place?: string; date?: string; start_date?: string; end_date?: string; nights: number; status: string; review_note?: string }[];
   service_log?: { id: string; title?: string; hours: number; date?: string; note?: string; status: string; review_note?: string }[];
