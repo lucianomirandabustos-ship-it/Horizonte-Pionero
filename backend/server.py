@@ -682,7 +682,8 @@ async def upload_file(file: UploadFile = File(...), purpose: str = Form("misc"),
         "content_type": file.content_type or "application/octet-stream",
         "original_name": file.filename,
         "size": len(contents),
-        "storage": "local",
+        "data": contents,
+        "storage": "mongo",
         "created_at": utc_now(),
     })
     return {"path": obj_path, "size": len(contents)}
@@ -741,7 +742,8 @@ async def upload_file_base64(input: Base64UploadInput, authorization: Optional[s
         "content_type": f"image/{ext}",
         "original_name": input.filename,
         "size": len(contents),
-        "storage": "local",
+        "data": contents,
+        "storage": "mongo",
         "created_at": utc_now(),
     })
     return {"path": obj_path, "size": len(contents)}
@@ -773,10 +775,17 @@ async def get_file(full_path: str, token: Optional[str] = Query(default=None), a
         if record["owner_id"] != user["user_id"] and not (user.get("role") == "dirigente" and user.get("verification_status") == "verificado"):
             raise HTTPException(status_code=403, detail="Sin permiso")
 
+    # 1. Si los datos binarios están guardados en MongoDB Atlas (persistente 100% contra reinicios de Render)
+    if "data" in record and record["data"]:
+        content_type = record.get("content_type") or "image/jpeg"
+        return Response(content=record["data"], media_type=content_type)
+
+    # 2. Si está en el disco local
     file_path = UPLOAD_DIR / full_path
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Archivo no disponible")
-    return FileResponse(file_path, media_type=record.get("content_type") or "application/octet-stream")
+    if file_path.exists():
+        return FileResponse(file_path, media_type=record.get("content_type") or "application/octet-stream")
+
+    raise HTTPException(status_code=404, detail="Archivo no disponible")
 
 # --------- Dirigente: Verification management ---------
 @api_router.get("/admin/dirigentes/pending")
